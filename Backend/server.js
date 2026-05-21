@@ -2,29 +2,24 @@ const express = require("express");
 const http = require("http");
 const path = require("path");
 const cors = require("cors");
-
 const { Server } = require("socket.io");
 
 const app = express();
-
 const server = http.createServer(app);
 
-const io = new Server(server,{
-    cors:{
-        origin:"*"
-    }
+const io = new Server(server, {
+  cors: { origin: "*" }
 });
 
-app.use(cors());
+/*
+IMPORTANT FIX: correct frontend path
+*/
+const FRONTEND_PATH = path.join(__dirname, "../frontend");
 
-app.use(express.static(__dirname));
+app.use(express.static(FRONTEND_PATH));
 
-app.get("/",(req,res)=>{
-
-    res.sendFile(
-        path.join(__dirname,"Frontend/index.html")
-    );
-
+app.get("/", (req, res) => {
+  res.sendFile(path.join(FRONTEND_PATH, "index.html"));
 });
 
 /*
@@ -32,143 +27,53 @@ ROOMS
 */
 let rooms = {};
 
-/*
-SOCKET
-*/
-io.on("connection",(socket)=>{
+io.on("connection", (socket) => {
 
-    console.log("Player Connected");
+  socket.on("joinRoom", (data) => {
 
-    /*
-    JOIN ROOM
-    */
-    socket.on("joinRoom",(data)=>{
+    const roomId = data.room || "GLOBAL";
 
-        const roomId =
-        data.room || "GLOBAL";
+    socket.join(roomId);
+    socket.roomId = roomId;
 
-        socket.join(roomId);
+    if (!rooms[roomId]) rooms[roomId] = {};
 
-        socket.roomId = roomId;
+    rooms[roomId][socket.id] = {
+      x: 500,
+      y: 300,
+      rotation: 0,
+      name: data.name || "Player"
+    };
 
-        if(!rooms[roomId]){
-            rooms[roomId] = {};
-        }
+  });
 
-        rooms[roomId][socket.id] = {
+  socket.on("move", (data) => {
 
-            id:socket.id,
+    const roomId = socket.roomId;
 
-            name:data.name || "Player",
+    if (rooms[roomId]?.[socket.id]) {
+      rooms[roomId][socket.id].x = data.x;
+      rooms[roomId][socket.id].y = data.y;
+      rooms[roomId][socket.id].rotation = data.rotation;
+    }
 
-            x:Math.random()*2000,
+  });
 
-            y:Math.random()*1200,
+  socket.on("shoot", (data) => {
+    socket.to(socket.roomId).emit("playerShoot", data);
+  });
 
-            rotation:0,
-
-            health:100,
-
-            kills:0
-
-        };
-
-        console.log(
-            data.name +
-            " joined " +
-            roomId
-        );
-
-    });
-
-    /*
-    MOVE
-    */
-    socket.on("move",(data)=>{
-
-        const roomId = socket.roomId;
-
-        if(
-            roomId &&
-            rooms[roomId] &&
-            rooms[roomId][socket.id]
-        ){
-
-            rooms[roomId][socket.id].x =
-            data.x;
-
-            rooms[roomId][socket.id].y =
-            data.y;
-
-            rooms[roomId][socket.id].rotation =
-            data.rotation;
-
-        }
-
-    });
-
-    /*
-    SHOOT
-    */
-    socket.on("shoot",(data)=>{
-
-        socket.to(socket.roomId).emit(
-            "playerShoot",
-            data
-        );
-
-    });
-
-    /*
-    PLAYERS UPDATE
-    */
-    const interval = setInterval(()=>{
-
-        const roomId = socket.roomId;
-
-        if(roomId && rooms[roomId]){
-
-            io.to(roomId).emit(
-                "players",
-                rooms[roomId]
-            );
-
-        }
-
-    },40);
-
-    /*
-    DISCONNECT
-    */
-    socket.on("disconnect",()=>{
-
-        const roomId = socket.roomId;
-
-        if(
-            roomId &&
-            rooms[roomId] &&
-            rooms[roomId][socket.id]
-        ){
-
-            delete rooms[roomId][socket.id];
-
-        }
-
-        clearInterval(interval);
-
-        console.log("Player Left");
-
-    });
+  setInterval(() => {
+    const roomId = socket.roomId;
+    if (rooms[roomId]) {
+      io.to(roomId).emit("players", rooms[roomId]);
+    }
+  }, 50);
 
 });
 
-const PORT =
-process.env.PORT || 3000;
+const PORT = process.env.PORT || 3000;
 
-server.listen(PORT,()=>{
-
-    console.log(
-        "Server Running On " + PORT
-    );
-
+server.listen(PORT, () => {
+  console.log("Server running on", PORT);
 });
