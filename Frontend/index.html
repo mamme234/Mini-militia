@@ -31,8 +31,8 @@ font-family:Arial;
 background:
 linear-gradient(
 180deg,
-#0d1522,
-#1d2b3f
+#101820,
+#1b2a41
 );
 }
 
@@ -52,7 +52,7 @@ justify-content:space-between;
 
 padding:0 15px;
 
-background:rgba(0,0,0,0.4);
+background:rgba(0,0,0,0.45);
 
 backdrop-filter:blur(12px);
 
@@ -86,6 +86,7 @@ border:1px solid #555;
 #health{
 width:100%;
 height:100%;
+
 background:
 linear-gradient(
 90deg,
@@ -128,12 +129,12 @@ z-index:999;
 }
 
 /*
-SHOOT
+SHOOT BUTTON
 */
 #shootBtn{
 position:fixed;
 
-right:85px;
+right:90px;
 bottom:190px;
 
 width:90px;
@@ -149,58 +150,14 @@ linear-gradient(
 #cc0000
 );
 
+box-shadow:
+0 0 30px rgba(255,0,0,0.7);
+
 color:white;
 
 font-size:30px;
 
-box-shadow:
-0 0 25px rgba(255,0,0,0.7);
-
 z-index:999;
-}
-
-/*
-RESPAWN
-*/
-#respawn{
-display:none;
-
-position:fixed;
-
-top:50%;
-left:50%;
-
-transform:translate(-50%,-50%);
-
-background:#1a1a1a;
-
-padding:30px;
-
-border-radius:20px;
-
-color:white;
-
-text-align:center;
-
-z-index:9999;
-}
-
-#respawn button{
-
-margin-top:15px;
-
-padding:12px 25px;
-
-border:none;
-
-border-radius:12px;
-
-background:#00cc66;
-
-color:white;
-
-font-size:18px;
-
 }
 
 canvas{
@@ -235,34 +192,27 @@ ROOM: GLOBAL
 🔥
 </button>
 
-<div id="respawn">
-
-<h2>You Died</h2>
-
-<button onclick="location.reload()">
-Respawn
-</button>
-
-</div>
-
 <script>
 
 /*
 TELEGRAM
 */
-const tg = window.Telegram.WebApp;
+const tg =
+window.Telegram.WebApp;
 
 tg.expand();
 
 /*
 ROOM
 */
-const params = new URLSearchParams(
+const params =
+new URLSearchParams(
 window.location.search
 );
 
 const ROOM_ID =
-params.get("room") || "GLOBAL";
+params.get("room") ||
+"GLOBAL";
 
 /*
 SOCKET
@@ -284,18 +234,16 @@ let moveY = 0;
 let aimX = 1;
 let aimY = 0;
 
-let kills = 0;
-
 /*
 CONFIG
 */
 const config = {
 
-type: Phaser.AUTO,
+type:Phaser.AUTO,
 
-width: window.innerWidth,
+width:window.innerWidth,
 
-height: window.innerHeight,
+height:window.innerHeight,
 
 backgroundColor:"#101820",
 
@@ -315,21 +263,30 @@ update
 
 };
 
-const game = new Phaser.Game(config);
+const game =
+new Phaser.Game(config);
 
 /*
 PRELOAD
 */
 function preload(){
 
+/*
+KENNEY STYLE ASSETS
+*/
 this.load.image(
 "player",
-"https://labs.phaser.io/assets/sprites/phaser-dude.png"
+"https://raw.githubusercontent.com/KenneyNL/Assets/master/PNG/Characters/character_robot.png"
 );
 
 this.load.image(
 "bullet",
 "https://labs.phaser.io/assets/sprites/bullets/bullet7.png"
+);
+
+this.load.image(
+"bg",
+"https://images.unsplash.com/photo-1511512578047-dfb367046420?q=80&w=1400"
 );
 
 }
@@ -340,46 +297,65 @@ CREATE
 function create(){
 
 /*
+BACKGROUND
+*/
+this.add.image(
+1500,
+750,
+"bg"
+)
+.setDisplaySize(
+3000,
+1500
+);
+
+/*
 WORLD
 */
 this.physics.world.setBounds(
 0,
 0,
-2500,
-1400
+3000,
+1500
 );
 
 /*
 PLAYER
 */
-player = this.physics.add.sprite(
+player =
+this.physics.add.sprite(
 500,
 500,
 "player"
 );
 
-player.setScale(1.3);
+player.setScale(1.4);
 
 player.setCollideWorldBounds(true);
 
 /*
+BULLETS
+*/
+bullets =
+this.physics.add.group();
+
+/*
 CAMERA
 */
-this.cameras.main.startFollow(player);
+this.cameras.main.startFollow(
+player
+);
 
-this.cameras.main.setZoom(1.15);
+this.cameras.main.setZoom(
+1.15
+);
 
 this.cameras.main.setBounds(
 0,
 0,
-2500,
-1400
+3000,
+1500
 );
-
-/*
-BULLETS
-*/
-bullets = this.physics.add.group();
 
 /*
 JOIN ROOM
@@ -405,7 +381,8 @@ document.getElementById(
 /*
 LEFT JOYSTICK
 */
-const leftJoystick = nipplejs.create({
+const leftJoystick =
+nipplejs.create({
 
 zone:
 document.getElementById(
@@ -444,7 +421,8 @@ moveY = 0;
 /*
 RIGHT JOYSTICK
 */
-const rightJoystick = nipplejs.create({
+const rightJoystick =
+nipplejs.create({
 
 zone:
 document.getElementById(
@@ -503,12 +481,19 @@ players[id].y,
 "player"
 );
 
+otherPlayers[id].setScale(
+1.4
+);
+
 }else{
 
 otherPlayers[id].setPosition(
 players[id].x,
 players[id].y
 );
+
+otherPlayers[id].rotation =
+players[id].rotation;
 
 }
 
@@ -530,11 +515,10 @@ data.y,
 "bullet"
 );
 
-this.physics.moveTo(
-bullet,
-data.tx,
-data.ty,
-950
+this.physics.velocityFromRotation(
+data.rotation,
+900,
+bullet.body.velocity
 );
 
 });
@@ -546,11 +530,11 @@ SHOOT
 */
 function shoot(scene){
 
-const tx =
-player.x + (aimX * 350);
-
-const ty =
-player.y + (aimY * 350);
+const rotation =
+Math.atan2(
+aimY,
+aimX
+);
 
 const bullet =
 bullets.create(
@@ -559,11 +543,10 @@ player.y,
 "bullet"
 );
 
-scene.physics.moveTo(
-bullet,
-tx,
-ty,
-950
+scene.physics.velocityFromRotation(
+rotation,
+900,
+bullet.body.velocity
 );
 
 /*
@@ -571,7 +554,7 @@ CAMERA SHAKE
 */
 scene.cameras.main.shake(
 80,
-0.003
+0.004
 );
 
 socket.emit(
@@ -579,8 +562,7 @@ socket.emit(
 {
 x:player.x,
 y:player.y,
-tx,
-ty
+rotation
 }
 );
 
@@ -605,7 +587,7 @@ moveY * speed
 );
 
 /*
-ROTATE PLAYER
+ROTATION
 */
 player.rotation =
 Math.atan2(
@@ -620,7 +602,8 @@ socket.emit(
 "move",
 {
 x:player.x,
-y:player.y
+y:player.y,
+rotation:player.rotation
 }
 );
 
