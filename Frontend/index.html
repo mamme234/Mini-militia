@@ -3,13 +3,17 @@
 <head>
 
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<meta name="viewport"
+content="width=device-width,initial-scale=1">
 
 <title>Battle Arena</title>
 
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
 <script src="https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.js"></script>
-<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+
+<script src="/socket.io/socket.io.js"></script>
 
 <style>
 
@@ -25,37 +29,52 @@ background:#111;
 font-family:Arial;
 }
 
-#ui{
+canvas{
+display:block;
+}
+
+/*
+TOP UI
+*/
+#topUI{
 position:fixed;
 top:10px;
 left:10px;
 z-index:999;
 color:white;
-font-size:18px;
+font-size:20px;
+font-weight:bold;
 }
 
+/*
+SHOOT BUTTON
+*/
 #shootBtn{
 position:fixed;
 bottom:40px;
 right:30px;
-width:80px;
-height:80px;
-border-radius:50%;
+width:90px;
+height:90px;
 border:none;
+border-radius:50%;
 background:#ff4444;
 color:white;
-font-size:22px;
+font-size:30px;
 z-index:999;
 }
 
-#joystick{
+/*
+MOVE AREA
+*/
+#movePad{
 position:fixed;
 bottom:40px;
 left:30px;
 width:120px;
 height:120px;
 border-radius:50%;
-background:rgba(255,255,255,0.1);
+background:rgba(255,255,255,0.08);
+border:2px solid rgba(255,255,255,0.2);
 z-index:999;
 }
 
@@ -63,35 +82,49 @@ z-index:999;
 </head>
 <body>
 
-<div id="ui">
+<div id="topUI">
 Kills: <span id="kills">0</span>
 </div>
 
-<div id="joystick"></div>
+<div id="movePad"></div>
 
 <button id="shootBtn">🔥</button>
 
 <script>
 
+/*
+TELEGRAM
+*/
 const tg = window.Telegram.WebApp;
+
 tg.expand();
 
+/*
+SOCKET
+*/
 const socket = io();
 
+/*
+GAME VARIABLES
+*/
 let player;
-let cursors;
 let bullets;
+let cursors;
 let otherPlayers = {};
 let kills = 0;
 
+/*
+PHASER CONFIG
+*/
 const config = {
 
 type: Phaser.AUTO,
 
 width: window.innerWidth,
+
 height: window.innerHeight,
 
-backgroundColor:"#222",
+backgroundColor:"#1b1b1b",
 
 physics:{
 default:"arcade",
@@ -109,50 +142,81 @@ update
 
 };
 
+/*
+START GAME
+*/
 const game = new Phaser.Game(config);
 
+/*
+PRELOAD
+*/
 function preload(){
 
 this.load.image(
-'player',
-'https://labs.phaser.io/assets/sprites/phaser-dude.png'
+"player",
+"https://labs.phaser.io/assets/sprites/phaser-dude.png"
 );
 
 this.load.image(
-'bullet',
-'https://labs.phaser.io/assets/sprites/bullets/bullet7.png'
+"bullet",
+"https://labs.phaser.io/assets/sprites/bullets/bullet7.png"
 );
 
 }
 
+/*
+CREATE
+*/
 function create(){
 
-player = this.physics.add.sprite(300,300,'player');
+/*
+PLAYER
+*/
+player = this.physics.add.sprite(
+300,
+300,
+"player"
+);
+
+player.setScale(1.2);
 
 player.setCollideWorldBounds(true);
 
-player.health = 100;
-
+/*
+BULLETS
+*/
 bullets = this.physics.add.group();
 
+/*
+KEYBOARD
+*/
 cursors = this.input.keyboard.createCursorKeys();
 
+/*
+JOIN GAME
+*/
 socket.emit("join",{
 name:tg.initDataUnsafe.user?.first_name || "Player"
 });
 
+/*
+OTHER PLAYERS
+*/
 socket.on("players",(players)=>{
 
 for(let id in players){
 
 if(id === socket.id) continue;
 
+/*
+CREATE PLAYER
+*/
 if(!otherPlayers[id]){
 
 otherPlayers[id] = this.physics.add.sprite(
 players[id].x,
 players[id].y,
-'player'
+"player"
 );
 
 }else{
@@ -168,12 +232,15 @@ players[id].y
 
 });
 
+/*
+REMOTE SHOOT
+*/
 socket.on("playerShoot",(data)=>{
 
 const bullet = bullets.create(
 data.x,
 data.y,
-'bullet'
+"bullet"
 );
 
 this.physics.moveTo(
@@ -185,22 +252,32 @@ data.ty,
 
 });
 
+/*
+SHOOT BUTTON
+*/
 document.getElementById("shootBtn").onclick = ()=>{
 
 const pointer = this.input.activePointer;
 
-shootBullet(pointer.x,pointer.y,this);
+shoot(
+pointer.x,
+pointer.y,
+this
+);
 
 };
 
 }
 
-function shootBullet(tx,ty,scene){
+/*
+SHOOT
+*/
+function shoot(tx,ty,scene){
 
 const bullet = bullets.create(
 player.x,
 player.y,
-'bullet'
+"bullet"
 );
 
 scene.physics.moveTo(
@@ -219,28 +296,45 @@ ty
 
 }
 
+/*
+UPDATE
+*/
 function update(){
 
 const speed = 250;
 
 player.setVelocity(0);
 
+/*
+MOVE
+*/
 if(cursors.left.isDown){
+
 player.setVelocityX(-speed);
+
 }
 
 if(cursors.right.isDown){
+
 player.setVelocityX(speed);
+
 }
 
 if(cursors.up.isDown){
+
 player.setVelocityY(-speed);
+
 }
 
 if(cursors.down.isDown){
+
 player.setVelocityY(speed);
+
 }
 
+/*
+SEND POSITION
+*/
 socket.emit("move",{
 x:player.x,
 y:player.y
@@ -251,4 +345,4 @@ y:player.y
 </script>
 
 </body>
-  </html>
+</html>
