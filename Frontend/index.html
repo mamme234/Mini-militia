@@ -7,13 +7,15 @@
 <meta name="viewport"
 content="width=device-width,initial-scale=1">
 
-<title>Battle Arena</title>
+<title>Mini Militia TG</title>
 
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
 <script src="https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.js"></script>
 
 <script src="/socket.io/socket.io.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/nipplejs@0.10.1/dist/nipplejs.min.js"></script>
 
 <style>
 
@@ -25,70 +27,223 @@ box-sizing:border-box;
 
 body{
 overflow:hidden;
-background:#111;
 font-family:Arial;
+background:
+linear-gradient(
+180deg,
+#0d1522,
+#1d2b3f
+);
+}
+
+/*
+TOP BAR
+*/
+#topBar{
+position:fixed;
+top:0;
+left:0;
+width:100%;
+height:65px;
+
+display:flex;
+align-items:center;
+justify-content:space-between;
+
+padding:0 15px;
+
+background:rgba(0,0,0,0.4);
+
+backdrop-filter:blur(12px);
+
+border-bottom:
+1px solid rgba(255,255,255,0.08);
+
+z-index:999;
+}
+
+/*
+ROOM
+*/
+#roomCode{
+color:white;
+font-size:18px;
+font-weight:bold;
+}
+
+/*
+HEALTH
+*/
+#healthBox{
+width:160px;
+height:22px;
+background:#222;
+border-radius:12px;
+overflow:hidden;
+border:1px solid #555;
+}
+
+#health{
+width:100%;
+height:100%;
+background:
+linear-gradient(
+90deg,
+#00ff66,
+#00cc55
+);
+}
+
+/*
+KILLS
+*/
+#kills{
+color:white;
+font-size:18px;
+font-weight:bold;
+}
+
+/*
+LEFT JOYSTICK
+*/
+#leftJoystick{
+position:fixed;
+left:20px;
+bottom:20px;
+width:150px;
+height:150px;
+z-index:999;
+}
+
+/*
+RIGHT JOYSTICK
+*/
+#rightJoystick{
+position:fixed;
+right:20px;
+bottom:20px;
+width:150px;
+height:150px;
+z-index:999;
+}
+
+/*
+SHOOT
+*/
+#shootBtn{
+position:fixed;
+
+right:85px;
+bottom:190px;
+
+width:90px;
+height:90px;
+
+border:none;
+border-radius:50%;
+
+background:
+linear-gradient(
+180deg,
+#ff6666,
+#cc0000
+);
+
+color:white;
+
+font-size:30px;
+
+box-shadow:
+0 0 25px rgba(255,0,0,0.7);
+
+z-index:999;
+}
+
+/*
+RESPAWN
+*/
+#respawn{
+display:none;
+
+position:fixed;
+
+top:50%;
+left:50%;
+
+transform:translate(-50%,-50%);
+
+background:#1a1a1a;
+
+padding:30px;
+
+border-radius:20px;
+
+color:white;
+
+text-align:center;
+
+z-index:9999;
+}
+
+#respawn button{
+
+margin-top:15px;
+
+padding:12px 25px;
+
+border:none;
+
+border-radius:12px;
+
+background:#00cc66;
+
+color:white;
+
+font-size:18px;
+
 }
 
 canvas{
 display:block;
 }
 
-/*
-TOP UI
-*/
-#topUI{
-position:fixed;
-top:10px;
-left:10px;
-z-index:999;
-color:white;
-font-size:20px;
-font-weight:bold;
-}
-
-/*
-SHOOT BUTTON
-*/
-#shootBtn{
-position:fixed;
-bottom:40px;
-right:30px;
-width:90px;
-height:90px;
-border:none;
-border-radius:50%;
-background:#ff4444;
-color:white;
-font-size:30px;
-z-index:999;
-}
-
-/*
-MOVE AREA
-*/
-#movePad{
-position:fixed;
-bottom:40px;
-left:30px;
-width:120px;
-height:120px;
-border-radius:50%;
-background:rgba(255,255,255,0.08);
-border:2px solid rgba(255,255,255,0.2);
-z-index:999;
-}
-
 </style>
 </head>
 <body>
 
-<div id="topUI">
-Kills: <span id="kills">0</span>
+<div id="topBar">
+
+<div id="roomCode">
+ROOM: GLOBAL
 </div>
 
-<div id="movePad"></div>
+<div id="healthBox">
+<div id="health"></div>
+</div>
 
-<button id="shootBtn">🔥</button>
+<div id="kills">
+0 KILLS
+</div>
+
+</div>
+
+<div id="leftJoystick"></div>
+
+<div id="rightJoystick"></div>
+
+<button id="shootBtn">
+🔥
+</button>
+
+<div id="respawn">
+
+<h2>You Died</h2>
+
+<button onclick="location.reload()">
+Respawn
+</button>
+
+</div>
 
 <script>
 
@@ -100,21 +255,39 @@ const tg = window.Telegram.WebApp;
 tg.expand();
 
 /*
+ROOM
+*/
+const params = new URLSearchParams(
+window.location.search
+);
+
+const ROOM_ID =
+params.get("room") || "GLOBAL";
+
+/*
 SOCKET
 */
 const socket = io();
 
 /*
-GAME VARIABLES
+VARIABLES
 */
 let player;
+
 let bullets;
-let cursors;
+
 let otherPlayers = {};
+
+let moveX = 0;
+let moveY = 0;
+
+let aimX = 1;
+let aimY = 0;
+
 let kills = 0;
 
 /*
-PHASER CONFIG
+CONFIG
 */
 const config = {
 
@@ -124,7 +297,7 @@ width: window.innerWidth,
 
 height: window.innerHeight,
 
-backgroundColor:"#1b1b1b",
+backgroundColor:"#101820",
 
 physics:{
 default:"arcade",
@@ -142,9 +315,6 @@ update
 
 };
 
-/*
-START GAME
-*/
 const game = new Phaser.Game(config);
 
 /*
@@ -170,17 +340,41 @@ CREATE
 function create(){
 
 /*
+WORLD
+*/
+this.physics.world.setBounds(
+0,
+0,
+2500,
+1400
+);
+
+/*
 PLAYER
 */
 player = this.physics.add.sprite(
-300,
-300,
+500,
+500,
 "player"
 );
 
-player.setScale(1.2);
+player.setScale(1.3);
 
 player.setCollideWorldBounds(true);
+
+/*
+CAMERA
+*/
+this.cameras.main.startFollow(player);
+
+this.cameras.main.setZoom(1.15);
+
+this.cameras.main.setBounds(
+0,
+0,
+2500,
+1400
+);
 
 /*
 BULLETS
@@ -188,32 +382,122 @@ BULLETS
 bullets = this.physics.add.group();
 
 /*
-KEYBOARD
+JOIN ROOM
 */
-cursors = this.input.keyboard.createCursorKeys();
+socket.emit("joinRoom",{
 
-/*
-JOIN GAME
-*/
-socket.emit("join",{
-name:tg.initDataUnsafe.user?.first_name || "Player"
+room:ROOM_ID,
+
+name:
+tg.initDataUnsafe.user?.first_name
+|| "Player"
+
 });
 
 /*
-OTHER PLAYERS
+ROOM UI
 */
-socket.on("players",(players)=>{
+document.getElementById(
+"roomCode"
+).innerText =
+"ROOM: " + ROOM_ID;
+
+/*
+LEFT JOYSTICK
+*/
+const leftJoystick = nipplejs.create({
+
+zone:
+document.getElementById(
+"leftJoystick"
+),
+
+mode:"static",
+
+position:{
+left:"75px",
+top:"75px"
+},
+
+color:"white"
+
+});
+
+leftJoystick.on(
+"move",
+(evt,data)=>{
+
+moveX = data.vector.x;
+moveY = data.vector.y;
+
+});
+
+leftJoystick.on(
+"end",
+()=>{
+
+moveX = 0;
+moveY = 0;
+
+});
+
+/*
+RIGHT JOYSTICK
+*/
+const rightJoystick = nipplejs.create({
+
+zone:
+document.getElementById(
+"rightJoystick"
+),
+
+mode:"static",
+
+position:{
+left:"75px",
+top:"75px"
+},
+
+color:"red"
+
+});
+
+rightJoystick.on(
+"move",
+(evt,data)=>{
+
+aimX = data.vector.x;
+aimY = data.vector.y;
+
+});
+
+/*
+SHOOT
+*/
+document.getElementById(
+"shootBtn"
+).onclick = ()=>{
+
+shoot(this);
+
+};
+
+/*
+PLAYERS
+*/
+socket.on(
+"players",
+(players)=>{
 
 for(let id in players){
 
-if(id === socket.id) continue;
+if(id === socket.id)
+continue;
 
-/*
-CREATE PLAYER
-*/
 if(!otherPlayers[id]){
 
-otherPlayers[id] = this.physics.add.sprite(
+otherPlayers[id] =
+this.physics.add.sprite(
 players[id].x,
 players[id].y,
 "player"
@@ -235,9 +519,12 @@ players[id].y
 /*
 REMOTE SHOOT
 */
-socket.on("playerShoot",(data)=>{
+socket.on(
+"playerShoot",
+(data)=>{
 
-const bullet = bullets.create(
+const bullet =
+bullets.create(
 data.x,
 data.y,
 "bullet"
@@ -247,34 +534,26 @@ this.physics.moveTo(
 bullet,
 data.tx,
 data.ty,
-700
+950
 );
 
 });
-
-/*
-SHOOT BUTTON
-*/
-document.getElementById("shootBtn").onclick = ()=>{
-
-const pointer = this.input.activePointer;
-
-shoot(
-pointer.x,
-pointer.y,
-this
-);
-
-};
 
 }
 
 /*
 SHOOT
 */
-function shoot(tx,ty,scene){
+function shoot(scene){
 
-const bullet = bullets.create(
+const tx =
+player.x + (aimX * 350);
+
+const ty =
+player.y + (aimY * 350);
+
+const bullet =
+bullets.create(
 player.x,
 player.y,
 "bullet"
@@ -284,15 +563,26 @@ scene.physics.moveTo(
 bullet,
 tx,
 ty,
-700
+950
 );
 
-socket.emit("shoot",{
+/*
+CAMERA SHAKE
+*/
+scene.cameras.main.shake(
+80,
+0.003
+);
+
+socket.emit(
+"shoot",
+{
 x:player.x,
 y:player.y,
 tx,
 ty
-});
+}
+);
 
 }
 
@@ -301,44 +591,38 @@ UPDATE
 */
 function update(){
 
-const speed = 250;
-
-player.setVelocity(0);
+const speed = 320;
 
 /*
 MOVE
 */
-if(cursors.left.isDown){
+player.setVelocityX(
+moveX * speed
+);
 
-player.setVelocityX(-speed);
+player.setVelocityY(
+moveY * speed
+);
 
-}
-
-if(cursors.right.isDown){
-
-player.setVelocityX(speed);
-
-}
-
-if(cursors.up.isDown){
-
-player.setVelocityY(-speed);
-
-}
-
-if(cursors.down.isDown){
-
-player.setVelocityY(speed);
-
-}
+/*
+ROTATE PLAYER
+*/
+player.rotation =
+Math.atan2(
+aimY,
+aimX
+);
 
 /*
 SEND POSITION
 */
-socket.emit("move",{
+socket.emit(
+"move",
+{
 x:player.x,
 y:player.y
-});
+}
+);
 
 }
 
