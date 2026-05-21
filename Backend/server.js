@@ -16,108 +16,146 @@ const io = new Server(server,{
 
 app.use(cors());
 
-/*
-SERVE FRONTEND
-*/
-app.use(express.static(path.join(__dirname,"../Frontend")));
+app.use(express.static(
+    path.join(__dirname,"../Frontend")
+));
 
-/*
-MAIN PAGE
-*/
 app.get("/",(req,res)=>{
-    res.sendFile(path.join(__dirname,"../Frontend/index.html"));
+
+    res.sendFile(
+        path.join(__dirname,"../Frontend/index.html")
+    );
+
 });
 
 /*
-PLAYERS
+ROOMS
 */
-let players = {};
+let rooms = {};
 
 /*
-SOCKET CONNECTION
+SOCKET
 */
 io.on("connection",(socket)=>{
 
-    console.log("Player Connected:",socket.id);
-
-    players[socket.id] = {
-        x:300,
-        y:300,
-        health:100,
-        kills:0,
-        name:"Player"
-    };
+    console.log("Player Connected");
 
     /*
-    PLAYER JOIN
+    JOIN ROOM
     */
-    socket.on("join",(data)=>{
+    socket.on("joinRoom",(data)=>{
 
-        if(players[socket.id]){
-            players[socket.id].name = data.name || "Player";
+        const roomId = data.room || "GLOBAL";
+
+        socket.join(roomId);
+
+        socket.roomId = roomId;
+
+        if(!rooms[roomId]){
+            rooms[roomId] = {};
         }
+
+        rooms[roomId][socket.id] = {
+
+            id:socket.id,
+
+            name:data.name || "Player",
+
+            x:Math.random()*2000,
+
+            y:Math.random()*1000,
+
+            health:100,
+
+            kills:0
+
+        };
+
+        console.log(data.name + " joined " + roomId);
 
     });
 
     /*
-    PLAYER MOVE
+    MOVE
     */
     socket.on("move",(data)=>{
 
-        if(players[socket.id]){
+        const roomId = socket.roomId;
 
-            players[socket.id].x = data.x;
-            players[socket.id].y = data.y;
+        if(
+            roomId &&
+            rooms[roomId] &&
+            rooms[roomId][socket.id]
+        ){
+
+            rooms[roomId][socket.id].x = data.x;
+            rooms[roomId][socket.id].y = data.y;
 
         }
 
     });
 
     /*
-    PLAYER SHOOT
+    SHOOT
     */
     socket.on("shoot",(data)=>{
 
-        socket.broadcast.emit("playerShoot",{
-            x:data.x,
-            y:data.y,
-            tx:data.tx,
-            ty:data.ty
-        });
+        socket.to(socket.roomId).emit(
+            "playerShoot",
+            data
+        );
 
     });
 
     /*
-    SEND PLAYERS
+    PLAYERS UPDATE
     */
     const interval = setInterval(()=>{
 
-        io.emit("players",players);
+        const roomId = socket.roomId;
 
-    },50);
+        if(roomId && rooms[roomId]){
+
+            io.to(roomId).emit(
+                "players",
+                rooms[roomId]
+            );
+
+        }
+
+    },40);
 
     /*
     DISCONNECT
     */
     socket.on("disconnect",()=>{
 
-        console.log("Player Left:",socket.id);
+        const roomId = socket.roomId;
 
-        delete players[socket.id];
+        if(
+            roomId &&
+            rooms[roomId] &&
+            rooms[roomId][socket.id]
+        ){
+
+            delete rooms[roomId][socket.id];
+
+        }
 
         clearInterval(interval);
+
+        console.log("Player Left");
 
     });
 
 });
 
-/*
-PORT
-*/
 const PORT = process.env.PORT || 3000;
 
 server.listen(PORT,()=>{
 
-    console.log("Server Running On Port " + PORT);
+    console.log(
+        "Server Running On Port " + PORT
+    );
 
 });
