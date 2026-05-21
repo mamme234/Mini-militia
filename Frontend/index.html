@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>Battle Arena</title>
+
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.js"></script>
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+
+<style>
+
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+}
+
+body{
+overflow:hidden;
+background:#111;
+font-family:Arial;
+}
+
+#ui{
+position:fixed;
+top:10px;
+left:10px;
+z-index:999;
+color:white;
+font-size:18px;
+}
+
+#shootBtn{
+position:fixed;
+bottom:40px;
+right:30px;
+width:80px;
+height:80px;
+border-radius:50%;
+border:none;
+background:#ff4444;
+color:white;
+font-size:22px;
+z-index:999;
+}
+
+#joystick{
+position:fixed;
+bottom:40px;
+left:30px;
+width:120px;
+height:120px;
+border-radius:50%;
+background:rgba(255,255,255,0.1);
+z-index:999;
+}
+
+</style>
+</head>
+<body>
+
+<div id="ui">
+Kills: <span id="kills">0</span>
+</div>
+
+<div id="joystick"></div>
+
+<button id="shootBtn">🔥</button>
+
+<script>
+
+const tg = window.Telegram.WebApp;
+tg.expand();
+
+const socket = io();
+
+let player;
+let cursors;
+let bullets;
+let otherPlayers = {};
+let kills = 0;
+
+const config = {
+
+type: Phaser.AUTO,
+
+width: window.innerWidth,
+height: window.innerHeight,
+
+backgroundColor:"#222",
+
+physics:{
+default:"arcade",
+arcade:{
+gravity:{y:0},
+debug:false
+}
+},
+
+scene:{
+preload,
+create,
+update
+}
+
+};
+
+const game = new Phaser.Game(config);
+
+function preload(){
+
+this.load.image(
+'player',
+'https://labs.phaser.io/assets/sprites/phaser-dude.png'
+);
+
+this.load.image(
+'bullet',
+'https://labs.phaser.io/assets/sprites/bullets/bullet7.png'
+);
+
+}
+
+function create(){
+
+player = this.physics.add.sprite(300,300,'player');
+
+player.setCollideWorldBounds(true);
+
+player.health = 100;
+
+bullets = this.physics.add.group();
+
+cursors = this.input.keyboard.createCursorKeys();
+
+socket.emit("join",{
+name:tg.initDataUnsafe.user?.first_name || "Player"
+});
+
+socket.on("players",(players)=>{
+
+for(let id in players){
+
+if(id === socket.id) continue;
+
+if(!otherPlayers[id]){
+
+otherPlayers[id] = this.physics.add.sprite(
+players[id].x,
+players[id].y,
+'player'
+);
+
+}else{
+
+otherPlayers[id].setPosition(
+players[id].x,
+players[id].y
+);
+
+}
+
+}
+
+});
+
+socket.on("playerShoot",(data)=>{
+
+const bullet = bullets.create(
+data.x,
+data.y,
+'bullet'
+);
+
+this.physics.moveTo(
+bullet,
+data.tx,
+data.ty,
+700
+);
+
+});
+
+document.getElementById("shootBtn").onclick = ()=>{
+
+const pointer = this.input.activePointer;
+
+shootBullet(pointer.x,pointer.y,this);
+
+};
+
+}
+
+function shootBullet(tx,ty,scene){
+
+const bullet = bullets.create(
+player.x,
+player.y,
+'bullet'
+);
+
+scene.physics.moveTo(
+bullet,
+tx,
+ty,
+700
+);
+
+socket.emit("shoot",{
+x:player.x,
+y:player.y,
+tx,
+ty
+});
+
+}
+
+function update(){
+
+const speed = 250;
+
+player.setVelocity(0);
+
+if(cursors.left.isDown){
+player.setVelocityX(-speed);
+}
+
+if(cursors.right.isDown){
+player.setVelocityX(speed);
+}
+
+if(cursors.up.isDown){
+player.setVelocityY(-speed);
+}
+
+if(cursors.down.isDown){
+player.setVelocityY(speed);
+}
+
+socket.emit("move",{
+x:player.x,
+y:player.y
+});
+
+}
+
+</script>
+
+</body>
+  </html>
