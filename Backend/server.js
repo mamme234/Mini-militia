@@ -2,6 +2,7 @@ const express = require("express");
 const http = require("http");
 const path = require("path");
 const cors = require("cors");
+
 const { Server } = require("socket.io");
 
 const app = express();
@@ -16,14 +17,12 @@ const io = new Server(server,{
 
 app.use(cors());
 
-app.use(express.static(
-    path.join(__dirname,"../Frontend")
-));
+app.use(express.static(__dirname));
 
 app.get("/",(req,res)=>{
 
     res.sendFile(
-        path.join(__dirname,"../Frontend/index.html")
+        path.join(__dirname,"index.html")
     );
 
 });
@@ -45,7 +44,8 @@ io.on("connection",(socket)=>{
     */
     socket.on("joinRoom",(data)=>{
 
-        const roomId = data.room || "GLOBAL";
+        const roomId =
+        data.room || "GLOBAL";
 
         socket.join(roomId);
 
@@ -63,7 +63,9 @@ io.on("connection",(socket)=>{
 
             x:Math.random()*2000,
 
-            y:Math.random()*1000,
+            y:Math.random()*1200,
+
+            rotation:0,
 
             health:100,
 
@@ -71,7 +73,11 @@ io.on("connection",(socket)=>{
 
         };
 
-        console.log(data.name + " joined " + roomId);
+        console.log(
+            data.name +
+            " joined " +
+            roomId
+        );
 
     });
 
@@ -88,8 +94,14 @@ io.on("connection",(socket)=>{
             rooms[roomId][socket.id]
         ){
 
-            rooms[roomId][socket.id].x = data.x;
-            rooms[roomId][socket.id].y = data.y;
+            rooms[roomId][socket.id].x =
+            data.x;
+
+            rooms[roomId][socket.id].y =
+            data.y;
+
+            rooms[roomId][socket.id].rotation =
+            data.rotation;
 
         }
 
@@ -150,12 +162,13 @@ io.on("connection",(socket)=>{
 
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT =
+process.env.PORT || 3000;
 
 server.listen(PORT,()=>{
 
     console.log(
-        "Server Running On Port " + PORT
+        "Server Running On " + PORT
     );
 
 });
